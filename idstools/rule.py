@@ -93,7 +93,9 @@ class Rule(dict):
 
     Dictionary fields:
 
-    - **enabled:** True if rule is enabled (uncommented), False is
+    - **group**: The group the rule belongs to, typically the filename.
+
+    - **enabled**: True if rule is enabled (uncommented), False is
         disabled (commented)
 
     - **action**: The action of the rule (alert, pass, etc) as a
@@ -123,10 +125,11 @@ class Rule(dict):
     :param action: Optional parameter to set the action of the rule
     """
 
-    def __init__(self, enabled=None, action=None):
+    def __init__(self, enabled=None, action=None, group=None):
         dict.__init__(self)
         self["enabled"] = enabled
         self["action"] = action
+        self["group"] = group
         self["gid"] = 1
         self["sid"] = None
         self["rev"] = None
@@ -169,7 +172,7 @@ class Rule(dict):
         """
         return "%s%s" % ("" if self.enabled else "# ", self.raw)
 
-def parse(buf):
+def parse(buf, group=None):
     """ Parse a single rule for a string buffer.
 
     :param buf: A string buffer containing a single Snort-like rule
@@ -181,7 +184,8 @@ def parse(buf):
         return
 
     rule = Rule(enabled=True if m.group("enabled") is None else False,
-                action=m.group("action"))
+                action=m.group("action"),
+                group=group)
 
     options = m.group("options")
     for p in option_patterns:
@@ -201,7 +205,7 @@ def parse(buf):
 
     return rule
 
-def parse_fileobj(fileobj):
+def parse_fileobj(fileobj, group=None):
     """ Parse multiple rules from a file like object.
 
     Note: At this time rules must exist on one line.
@@ -221,7 +225,7 @@ def parse_fileobj(fileobj):
             raise
     return rules
 
-def parse_file(filename):
+def parse_file(filename, group=None):
     """ Parse multiple rules from the provided filename.
 
     :param filename: Name of file to parse rules from
@@ -229,4 +233,4 @@ def parse_file(filename):
     :returns: A list of :py:class:`.Rule` instances, one for each rule parsed
     """
     with open(filename) as fileobj:
-        return parse_fileobj(fileobj)
+        return parse_fileobj(fileobj, group)

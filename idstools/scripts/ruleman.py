@@ -33,6 +33,7 @@ import tarfile
 import re
 import getopt
 import json
+import collections
 
 import yaml
 
@@ -43,102 +44,56 @@ if sys.argv[0] == __file__:
 import idstools.rule
 import idstools.ruleman.commands as commands
 
-config_template = {
-    "remotes": {},
-}
+class Config(collections.MutableMapping):
 
-class ReRuleMatcher(object):
-
-    def __init__(self, pattern):
-        self.pattern = pattern
-
-    @classmethod
-    def parse(cls, buf):
-        if buf.startswith("re:"):
-            try:
-                pattern = re.compile(buf.split(":", 1)[1], re.I)
-                return cls(pattern)
-            except:
-                pass
-        return None
-
-    def match(self, rule):
-        if self.pattern.search(rule.raw):
-            return True
-        else:
-            return False
-
-    def __repr__(self):
-        return "re:%s" % (self.pattern.pattern)
-
-class SidRuleMatcher(object):
-
-    def __init__(self, gid, sid):
-        self.gid = gid
-        self.sid = sid
-
-    @classmethod
-    def parse(cls, buf):
-        try:
-            parts = buf.split(":")
-            if len(parts) == 1:
-                return cls(1, int(parts[0]))
-            elif len(parts) > 1:
-                return cls(int(parts[0]), int(parts[1]))
-        except:
-            pass
-
-    def __repr__(self):
-        return "%d:%d" % (self.gid, self.sid)
-        
-def get_rule_matcher(arg):
-    matcher = ReRuleMatcher.parse(arg)
-    if matcher:
-        return matcher
-    matcher = SidRuleMatcher.parse(arg)
-    if matcher:
-        return matcher
-    return None
-
-def disable_rule(config, args):
-    matcher = get_rule_matcher(args[0])
-    if not matcher:
-        return 1
-    config["disabled-rules"].append(str(matcher))
-    config["disabled-rules"] = list(set(config["disabled-rules"]))
-
-class SearchCommand(object):
-
-    def run(self, args):
-
-        if not args:
-            print("error: nothing to search for.")
-            return 1
-
-        matcher = ReRuleMatcher.parse("re:" + args[0])
-
-        directories = ["rules", "so_rules", "preproc_rules"]
-
-        for directory in directories:
-            if os.path.exists(directory):
-                for dirpath, dirnames, filenames in os.walk(directory):
-                    for filename in filenames:
-                        if filename.endswith(".rules"):
-                            path = os.path.join(dirpath, filename)
-                            rules = idstools.rule.parse_fileobj(open(path))
-                            for rule in rules:
-                                if matcher.match(rule):
-                                    print("%s %s" % (
-                                        path, self.render_brief(rule)))
+    config_template = {
+        "remotes": {},
+        "disabled-rules": [],
+    }
     
-    def render_brief(self, rule):
-        return "%s[%d:%d:%d] %s" % (
-            "" if rule.enabled else "# ",
-            rule.gid, rule.sid, rule.rev,
-            rule.msg)
+    remote_template = {
+        "name": "",
+        "url": "",
+        "enabled": True,
+    }
+
+    def __init__(self):
+        self.store = dict()
+        self.update(dict(self.config_template))
+
+    def __getitem__(self, key):
+        return self.store[key]
+
+    def __setitem__(self, key, value):
+        self.store[key] = value
+
+    def __delitem__(self, key):
+        del self.store[key]
+
+    def __iter__(self):
+        return iter(self.store)
+
+    def __len__(self):
+        return len(self.store)
+
+    def get_remotes(self):
+        remotes = self.store["remotes"]
+        for remote in remotes.values():
+            for key, default in self.remote_template.items():
+                if key not in remote:
+                    remote[key] = default
+        return remotes
+
+    def save(self):
+        yaml.safe_dump(
+            self.store, 
+            open(".ruleman.yaml", "w"), 
+            default_flow_style=False)
+        os.rename(".ruleman.yaml", "ruleman.yaml")
 
 def load_config():
-    config = dict(config_template)
+    #config = dict(config_template)
+    config = Config()
     if os.path.exists("ruleman.yaml"):
         yaml_config = yaml.load(open("ruleman.yaml"))
         if yaml_config:
@@ -156,16 +111,14 @@ def main():
     command = args.pop(0)
     config = load_config()
 
-    if command == "disable":
-        ret = disable_rule(config, args)
-    elif command == "search":
-        ret = SearchCommand().run(args)
-    elif command in commands.commands:
+    if command in commands.commands:
         commands.commands[command](config, args).run()
+    else:
+        print("error: unknown command: %s" % (command), file=sys.stderr)
+        return 1
 
     # Dump a YAML config as well.
-    yaml.safe_dump(config, open(".ruleman.yaml", "w"), default_flow_style=False)
-    os.rename(".ruleman.yaml", "ruleman.yaml")
+    config.save()
 
 if __name__ == "__main__":
     sys.exit(main())

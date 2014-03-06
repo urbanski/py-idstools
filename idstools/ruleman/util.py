@@ -28,6 +28,7 @@
 from __future__ import print_function
 
 import tarfile
+import hashlib
 
 def get_filename_from_url(url):
     """Given a URL, attempt to derive the filename.
@@ -46,6 +47,12 @@ def get_filename_from_url(url):
 
     # Not found.
     return None
+
+def md5_file(fileobj):
+    return hashlib.md5(fileobj.read()).hexdigest()
+
+def md5_filename(filename):
+    return md5_file(open(filename))
 
 def extract_archive(filename, destination):
     """Extract an archive file (.tar.gz) to destination."""

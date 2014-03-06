@@ -30,10 +30,16 @@ from __future__ import print_function
 import sys
 import getopt
 import tempfile
-import time
+import subprocess
+import os.path
+import shutil
 
 import idstools.net
+import idstools.rule
+
 from idstools.ruleman import util
+from idstools.ruleman import matchers
+from idstools.ruleman import core
 
 class RemoteCommand(object):
 
@@ -41,16 +47,22 @@ class RemoteCommand(object):
 usage: %(progname)s remote [-h]
    or: %(progname)s remote add <name> <url>
    or: %(progname)s remote remove <name>
+   or: %(progname)s remote disable <name>
+   or: %(progname)s remote enable <name>
+   or: %(progname)s remote set <name> <parameter> <value>
 """ % {"progname": sys.argv[0]}
 
     def __init__(self, config, args):
         self.config = config
         self.args = args
-        self.remotes = config["remotes"]
+        self.remotes = config.get_remotes()
 
         self.subcommands = {
             "add": self.add,
             "remove": self.remove,
+            "enable": self.enable,
+            "disable": self.disable,
+            "set": self.set_parameter,
 
             # Aliases.
             "rm": self.remove,
@@ -82,6 +94,16 @@ usage: %(progname)s remote [-h]
         else:
             print("error: unknown subcommand: %s" % (command), file=sys.stderr)
 
+    def set_parameter(self):
+        name = self.args.pop(0)
+        key = self.args.pop(0)
+        val = self.args.pop(0)
+
+        if name not in self.remotes:
+            print("error: remote %s does not exist." % (name), file=sys.stderr)
+
+        self.remotes[name][key] = val
+
     def list(self):
         for remote in self.remotes:
             print("%s: %s" % (remote, self.remotes[remote]))
@@ -110,23 +132,45 @@ usage: %(progname)s remote [-h]
     
     remove.usage = "usage: remove <name>"
 
+    def enable(self):
+        name = self.args.pop(0)
+        if name not in self.remotes:
+            print("error: remote %s does not exist" % (name), file=sys.stderr)
+        self.remotes[name]["enabled"] = True
+
+    enable.usage = "usage: enable <name>"
+
+    def disable(self):
+        name = self.args.pop(0)
+        if name == "*":
+            for remote in self.remotes.values():
+                remote["enabled"] = False
+        else:
+            if name not in self.remotes:
+                print("error: remote %s does not exist" % (name),
+                      file=sys.stderr)
+                self.remotes[name]["enabled"] = False
+
+    disable.usage = "usage: disable <name>"
+
 class FetchCommand(object):
 
     def __init__(self, config, args):
         self.config = config
         self.args = args
 
-        self.remotes = self.config["remotes"]
+        self.remotes = self.config.get_remotes()
 
     def run(self):
 
         fetched = []
 
-        for name in self.remotes:
+        for remote in self.remotes.values():
             if self.args and name not in self.args:
                 continue
-            remote = self.remotes[name]
-            fileobj = self.fetch(self.remotes[name])
+            if not remote["enabled"]:
+                continue
+            fileobj = self.fetch(remote)
             if fileobj:
                 fetched.append({"remote": remote, "fileobj": fileobj})
 
@@ -134,7 +178,13 @@ class FetchCommand(object):
 
         for entry in fetched:
             print("Extracting %s." % entry["remote"]["name"])
-            util.extract_archive(entry["fileobj"].name, ".")
+            dest = "remotes/%s" % entry["remote"]["name"]
+            if os.path.exists(dest):
+                shutil.rmtree(dest)
+            os.makedirs(dest)
+            util.extract_archive(entry["fileobj"].name, dest)
+            open("%s/checksum" % (dest), "w").write(
+                util.md5_filename(entry["fileobj"].name))
 
         # for fileobj in fetched:
         #     util.extract_archive(fileobj.name, ".")
@@ -170,7 +220,164 @@ class FetchCommand(object):
     def extract(self, filename):
         util.extract_archive(filename, ".")
 
+class SyncCommand(object):
+
+    def __init__(self, config, args):
+        self.config = config
+        self.args = args
+
+    def run(self):
+        git = subprocess.Popen("git diff", shell=True, stdout=subprocess.PIPE)
+        diff = git.communicate()[0]
+        for line in diff.split("\n"):
+            if line.startswith(" "):
+                continue
+            elif line.startswith("---") or line.startswith("+++"):
+                continue
+            elif line.startswith("+"):
+                print(line)
+            elif line.startswith("-"):
+                print(line)
+
+class DisableRuleCommand(object):
+
+    usage = """
+usage: %(progname)s disable [-h]
+   or: %(progname)s disable [-r] <gid:sid>
+   or: %(progname)s disable [-r] re:<regex>
+
+    -r,--remove      Removes the rule matcher from the disabled list.
+""" % {"progname": sys.argv[0]}
+
+    def __init__(self, config, args):
+        self.config = config
+        self.args = args
+        self.opt_remove = False
+
+    def run(self):
+        try:
+            opts, self.args = getopt.getopt(
+                self.args, 
+                "hr",
+                ["help", "remove"])
+        except getopt.GetoptError as err:
+            print("error: %s" % (err), file=sys.stderr)
+            print(usage)
+            return 1
+        for o, a in opts:
+            if o == "-h":
+                print(self.usage)
+                return 0
+            elif o in ["-r", "--remove"]:
+                self.opt_remove = True
+
+        if not self.args:
+            return self.list()
+        elif self.opt_remove:
+            return self.remove()
+
+        descriptor = self.args[0]
+        message = " ".join(self.args[1:])
+
+        matcher = matchers.parse(self.args[0])
+        if not matcher:
+            print("error: invalid rule matcher: %s" % (descriptor))
+            return 1
+
+        disabled_rules = self.config["disabled-rules"]
+
+        exists = filter(lambda m: m["matcher"] == str(matcher), disabled_rules)
+        if exists:
+            print("error: rules matching %s are already disabled." % (
+                str(matcher)))
+            print(" - comment: %s" % (exists[0]["comment"]))
+            return 1
+
+        disabled_rules.append({
+            "matcher": str(matcher),
+            "comment": message,
+        })
+
+    def remove(self):
+        """Remove the matcher for the disabled list."""
+        self.config["disabled-rules"] = filter(
+            lambda m: m["matcher"] != self.args[0],
+            self.config["disabled-rules"])
+
+    def list(self):
+        for disabled in self.config["disabled-rules"]:
+            print("%s: %s" % (disabled["matcher"], disabled["comment"]))
+
+class SearchCommand(object):
+
+    def __init__(self, config, args):
+        self.config = config
+        self.args = args
+
+    def run(self):
+        if not self.args:
+            print("error: nothing to search for.")
+            return 1
+
+        matcher = matchers.ReRuleMatcher.parse("re:" + self.args[0])
+
+        directories = ["rules", "so_rules", "preproc_rules"]
+
+        for directory in [d for d in directories if os.path.exists(d)]:
+            for dirpath, dirnames, filenames in os.walk(directory):
+                for filename in \
+                    [fn for fn in filenames if fn.endswith(".rules")]:
+                    path = os.path.join(dirpath, filename)
+                    rules = idstools.rule.parse_fileobj(open(path))
+                    for rule in rules:
+                        if matcher.match(rule):
+                            print("%s %s" % (
+                                path, self.render_brief(rule)))
+
+    def render_brief(self, rule):
+        return "%s[%d:%d:%d] %s" % (
+            "" if rule.enabled else "# ",
+            rule.gid, rule.sid, rule.rev,
+            rule.msg)
+
+class ApplyCommand(object):
+
+    def __init__(self, config, args):
+        self.config = config
+        self.args = args
+
+    def run(self):
+
+        rulesets = []
+
+        remotes = self.config.get_remotes()
+        for remote in remotes.values():
+            if remote["enabled"]:
+                print("Loading rules from %s" % (remote["name"]))
+                ruleset = core.Ruleset(remote)
+                ruleset.load_rules()
+                print("- Loaded %d rules." % (len(ruleset.rules)))
+                rulesets.append(ruleset)
+
+        rules = {}
+
+        for ruleset in rulesets:
+            for rule_id, rule in ruleset.rules.items():
+                if rule.id in rules:
+                    print("Duplicate rule found:", rule.id)
+                else:
+                    rules[rule.id] = rule
+
+        with open("snort.rules", "wb") as fileobj:
+            for rule in rules.values():
+                fileobj.write(str(rule) + "\n")
+
 commands = {
     "fetch": FetchCommand,
     "remote": RemoteCommand,
+    "disable": DisableRuleCommand,
+    "search": SearchCommand,
+
+    "sync": SyncCommand,
+    "apply": ApplyCommand,
 }
