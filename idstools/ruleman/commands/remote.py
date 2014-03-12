@@ -28,8 +28,8 @@ from __future__ import print_function
 import sys
 import getopt
 
-from common import BaseCommand
-from common import CommandLineError
+from idstools.ruleman.commands.common import BaseCommand
+from idstools.ruleman.commands.common import CommandLineError
 
 class RemoteCommand(object):
 

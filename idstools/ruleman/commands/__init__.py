@@ -39,8 +39,8 @@ from idstools.ruleman import util
 from idstools.ruleman import matchers
 from idstools.ruleman import core
 
-from common import BaseCommand
-from common import CommandLineError
+from idstools.ruleman.commands.common import BaseCommand
+from idstools.ruleman.commands.common import CommandLineError
 
 from idstools.ruleman.commands.remote import RemoteCommand
 
