@@ -47,7 +47,7 @@ class Ruleset(object):
         self._filenames = None
 
     def get_filenames(self):
-        
+
         if self._filenames is not None:
             return self._filenames
 
@@ -55,8 +55,9 @@ class Ruleset(object):
 
         for dirpath, dirnames, filenames in os.walk(self.directory):
             for filename in filenames:
-                path = os.path.join(dirpath, filename)
-                self._filenames.append(path[len(self.directory) + 1:])
+                path = os.path.join(dirpath[len(self.directory) + 1:], filename)
+                if not path in self.config["ignore-files"]:
+                    self._filenames.append(path)
 
         return self._filenames
 

@@ -41,6 +41,51 @@ from idstools.ruleman import util
 from idstools.ruleman import matchers
 from idstools.ruleman import core
 
+class BaseCommand(object):
+    pass
+
+class CommandLineError(Exception):
+    pass
+
+class RemoteSubCommandIgnoreFile(BaseCommand):
+
+    usage = """
+usage: ignore-file <remote-name> <filename>
+   or: ignore-file --remove <remote-name> <filename>
+"""
+
+    def __init__(self, config, args):
+        self.config = config
+        self.args = args
+        self.remotes = config.get_remotes()
+
+        self.opt_remove = False
+
+    def run(self):
+        opts, self.args = getopt.getopt(self.args, "", ["remove"])
+        for o, a in opts:
+            if o in ["--remove"]:
+                self.opt_remove = True
+
+        try:
+            name = self.args.pop(0)
+            filename = self.args.pop(0)
+        except:
+            raise CommandLineError("not enough arguments")
+
+        if name not in self.remotes:
+            print("error: remote %s does not exist" % (name), file=sys.stderr)
+            return 1
+        remote = self.remotes[name]
+        if "ignore-files" not in remote:
+            remote["ignore-files"] = []
+        if self.opt_remove:
+            if filename in remote["ignore-files"]:
+                remote["ignore-files"].remove(filename)
+        else:
+            remote["ignore-files"].append(filename)
+            remote["ignore-files"] = list(set(remote["ignore-files"]))
+
 class RemoteCommand(object):
 
     usage = """
@@ -50,12 +95,16 @@ usage: %(progname)s remote [-h]
    or: %(progname)s remote disable <name>
    or: %(progname)s remote enable <name>
    or: %(progname)s remote set <name> <parameter> <value>
+   or: %(progname)s remote ignore-file <remote-name> <filename>
+   or: %(progname)s remote ignore-file --remove <remote-name> <filename>
 """ % {"progname": sys.argv[0]}
 
     def __init__(self, config, args):
         self.config = config
         self.args = args
         self.remotes = config.get_remotes()
+
+        self.opt_remove = False
 
         self.subcommands = {
             "add": self.add,
@@ -64,13 +113,15 @@ usage: %(progname)s remote [-h]
             "disable": self.disable,
             "set": self.set_parameter,
 
+            "ignore-file": RemoteSubCommandIgnoreFile,
+
             # Aliases.
             "rm": self.remove,
         }
 
     def run(self):
         try:
-            self.opts, self.args = getopt.getopt(self.args, "h")
+            self.opts, self.args = getopt.getopt(self.args, "h", ["remove"])
         except getopt.GetoptError as err:
             print("error: %s" % (err), file=sys.stderr)
             print(self.usage, file=sys.stderr)
@@ -79,6 +130,8 @@ usage: %(progname)s remote [-h]
             if o == "-h":
                 print(self.usage)
                 return 0
+            elif o in ["--remove"]:
+                self.opt_remove = True
 
         if not self.args:
             return self.list()
@@ -87,8 +140,12 @@ usage: %(progname)s remote [-h]
 
         if command in self.subcommands:
             try:
-                return self.subcommands[command]()
-            except Exception as err:
+                if issubclass(self.subcommands[command], BaseCommand):
+                    return self.subcommands[command](
+                        self.config, self.args).run()
+                else:
+                    return self.subcommands[command]()
+            except (getopt.GetoptError, CommandLineError) as err:
                 print("error: %s" % (err), file=sys.stderr)
                 print(self.subcommands[command].usage, file=sys.stderr)
         else:

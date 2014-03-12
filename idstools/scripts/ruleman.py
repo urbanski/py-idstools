@@ -55,6 +55,7 @@ class Config(collections.MutableMapping):
         "name": "",
         "url": "",
         "enabled": True,
+        "ignore-files": [],
     }
 
     def __init__(self):
@@ -92,7 +93,6 @@ class Config(collections.MutableMapping):
         os.rename(".ruleman.yaml", "ruleman.yaml")
 
 def load_config():
-    #config = dict(config_template)
     config = Config()
     if os.path.exists("ruleman.yaml"):
         yaml_config = yaml.load(open("ruleman.yaml"))
