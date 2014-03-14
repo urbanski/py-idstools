@@ -41,7 +41,6 @@ from idstools.ruleman import core
 
 from idstools.ruleman.commands.common import BaseCommand
 from idstools.ruleman.commands.common import CommandLineError
-
 from idstools.ruleman.commands.remote import RemoteCommand
 
 class FetchCommand(object):
@@ -258,6 +257,11 @@ class ApplyCommand(object):
                     print("Duplicate rule found:", rule.id)
                 else:
                     rules[rule.id] = rule
+
+        print("Resolving flowbit dependencies:")
+        flowbit_resolver = idstools.rule.FlowbitResolver()
+        enabled = flowbit_resolver.resolve(rules)
+        print("- Enabled %d rules" % (len(enabled)))
 
         with open("snort.rules", "wb") as fileobj:
             for rule in rules.values():

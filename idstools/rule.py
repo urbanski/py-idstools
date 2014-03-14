@@ -234,3 +234,45 @@ def parse_file(filename, group=None):
     """
     with open(filename) as fileobj:
         return parse_fileobj(fileobj, group)
+
+class FlowbitResolver(object):
+
+    setters = ["set", "setx", "unset", "toggle"]
+    getters = ["isset", "isnotset"]
+
+    def __init__(self):
+        self.enabled = []
+
+    def resolve(self, rules):
+        required = self.get_required_flowbits(rules)
+        enabled = self.set_required_flowbits(rules, required)
+        if enabled:
+            self.enabled += enabled
+            return self.resolve(rules)
+        return self.enabled
+
+    def set_required_flowbits(self, rules, required):
+        enabled = []
+        for rule in [rule for rule in rules.values() if not rule.enabled]:
+            for option, value in map(self.parse_flowbit, rule.flowbits):
+                if option in self.setters and value in required:
+                    rule.enabled = True
+                    enabled.append(rule)
+        return enabled
+
+    def get_required_flowbits(self, rules):
+        required_flowbits = set()
+        for rule in [rule for rule in rules.values() if rule.enabled]:
+            for option, value in map(self.parse_flowbit, rule.flowbits):
+                if option in self.getters:
+                    required_flowbits.add(value)
+        return required_flowbits
+                        
+    def parse_flowbit(self, flowbit):
+        tokens = flowbit.split(",", 1)
+        if len(tokens) == 1:
+            return tokens[0], None
+        elif len(tokens) == 2:
+            return tokens[0], tokens[1]
+        else:
+            raise Exception("Flowbit parse error on %s" % (flowbit))
