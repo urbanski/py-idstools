@@ -27,6 +27,7 @@ from __future__ import print_function
 
 import sys
 import getopt
+import types
 
 from idstools.ruleman.commands.common import BaseCommand
 from idstools.ruleman.commands.common import CommandLineError
@@ -85,7 +86,8 @@ usage: %(progname)s remote [-h]
 
         if command in self.subcommands:
             try:
-                if issubclass(self.subcommands[command], BaseCommand):
+                subcommand = self.subcommands[command]
+                if type(subcommand) == types.TypeType and issubclass(self.subcommands[command], BaseCommand):
                     return self.subcommands[command](
                         self.config, self.args).run()
                 else:
@@ -151,6 +153,8 @@ usage: %(progname)s remote [-h]
             if name not in self.remotes:
                 print("error: remote %s does not exist" % (name),
                       file=sys.stderr)
+                self.remotes[name]["enabled"] = False
+            else:
                 self.remotes[name]["enabled"] = False
 
     disable.usage = "usage: disable <name>"
