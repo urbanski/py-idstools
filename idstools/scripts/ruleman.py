@@ -29,11 +29,10 @@ from __future__ import print_function
 
 import sys
 import os
-import tarfile
-import re
 import getopt
 import json
 import collections
+import logging
 
 import yaml
 
@@ -41,8 +40,9 @@ if sys.argv[0] == __file__:
     sys.path.insert(
         0, os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
-import idstools.rule
 import idstools.ruleman.commands as commands
+
+logging.basicConfig(format="%(message)s", level=logging.INFO)
 
 class Config(collections.MutableMapping):
 

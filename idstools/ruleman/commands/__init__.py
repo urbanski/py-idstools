@@ -42,92 +42,8 @@ from idstools.ruleman import core
 from idstools.ruleman.commands.common import BaseCommand
 from idstools.ruleman.commands.common import CommandLineError
 from idstools.ruleman.commands.remote import RemoteCommand
-
-class FetchCommand(object):
-
-    def __init__(self, config, args):
-        self.config = config
-        self.args = args
-
-        self.remotes = self.config.get_remotes()
-
-    def run(self):
-
-        fetched = []
-
-        for remote in self.remotes.values():
-            if self.args and name not in self.args:
-                continue
-            if not remote["enabled"]:
-                continue
-            fileobj = self.fetch(remote)
-            if fileobj:
-                fetched.append({"remote": remote, "fileobj": fileobj})
-
-        print("Fetched:", [item["remote"]["name"] for item in fetched])
-
-        for entry in fetched:
-            print("Extracting %s." % entry["remote"]["name"])
-            dest = "remotes/%s" % entry["remote"]["name"]
-            if os.path.exists(dest):
-                shutil.rmtree(dest)
-            os.makedirs(dest)
-            util.extract_archive(entry["fileobj"].name, dest)
-            open("%s/checksum" % (dest), "w").write(
-                util.md5_filename(entry["fileobj"].name))
-
-        # for fileobj in fetched:
-        #     util.extract_archive(fileobj.name, ".")
-
-    def fetch(self, remote):
-        print("Fetching %s : %s" % (
-            remote["name"], util.get_filename_from_url(remote["url"])))
-        fileobj = tempfile.NamedTemporaryFile(
-            suffix=util.get_filename_from_url(remote["url"]))
-        try:
-            length, info = idstools.net.get(
-                remote["url"], fileobj, self.progress_hook)
-            # A print to print a new line.
-            print("")
-            return fileobj
-        except idstools.net.HTTPError as err:
-            # HTTP errors.
-            print(" error: %s %s" % (err.code, err.msg))
-            body = err.read().strip()
-            for line in body.split("\n"):
-                print("  | %s" % (line))
-        except Exception as err:
-            print(" error: %s" % (err))
-
-    def progress_hook(self, content_length, bytes_read):
-        percent = int((bytes_read / float(content_length)) * 100)
-        buf = " %3d%% - %-30s" % (
-            percent, "%d/%d" % (bytes_read, content_length))
-        sys.stdout.write(buf)
-        sys.stdout.flush()
-        sys.stdout.write("\b" * 38)
-
-    def extract(self, filename):
-        util.extract_archive(filename, ".")
-
-class SyncCommand(object):
-
-    def __init__(self, config, args):
-        self.config = config
-        self.args = args
-
-    def run(self):
-        git = subprocess.Popen("git diff", shell=True, stdout=subprocess.PIPE)
-        diff = git.communicate()[0]
-        for line in diff.split("\n"):
-            if line.startswith(" "):
-                continue
-            elif line.startswith("---") or line.startswith("+++"):
-                continue
-            elif line.startswith("+"):
-                print(line)
-            elif line.startswith("-"):
-                print(line)
+from idstools.ruleman.commands.fetch import FetchCommand
+from idstools.ruleman.commands.dumpdynamicrules import DumpDynamicRulesCommand
 
 class DisableRuleCommand(object):
 
@@ -258,11 +174,6 @@ class ApplyCommand(object):
                 else:
                     rules[rule.id] = rule
 
-        print("Resolving flowbit dependencies:")
-        flowbit_resolver = idstools.rule.FlowbitResolver()
-        enabled = flowbit_resolver.resolve(rules)
-        print("- Enabled %d rules" % (len(enabled)))
-
         with open("snort.rules", "wb") as fileobj:
             for rule in rules.values():
                 fileobj.write(str(rule) + "\n")
@@ -272,7 +183,6 @@ commands = {
     "remote": RemoteCommand,
     "disable": DisableRuleCommand,
     "search": SearchCommand,
-
-    "sync": SyncCommand,
     "apply": ApplyCommand,
+    "dump-dynamic-rules": DumpDynamicRulesCommand,
 }

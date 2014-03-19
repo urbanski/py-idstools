@@ -1,6 +1,4 @@
-#! /usr/bin/env python
-#
-# Copyright (c) 2011 Jason Ish
+# Copyright (c) 2011-2014 Jason Ish
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -27,47 +25,20 @@
 
 from __future__ import print_function
 
-import tarfile
-import hashlib
+import os
+import unittest
 import tempfile
-import shutil
-import atexit
 
-def get_filename_from_url(url):
-    """Given a URL, attempt to derive the filename.
+from idstools import snort
 
-    This is required as Snort VRT URLs append the oinkcode to the end
-    of the URL.
+class SnortAppTestCase(unittest.TestCase):
 
-    """
-
-    # Step backwards through the URL components looking for what might
-    # be a filename.
-    parts = url.split("/")
-    for part in reversed(parts):
-        if part.find(".") > -1:
-            return part
-
-    # Not found.
-    return None
-
-def md5_file(fileobj):
-    return hashlib.md5(fileobj.read()).hexdigest()
-
-def md5_filename(filename):
-    return md5_file(open(filename))
-
-def extract_archive(filename, destination):
-    """Extract an archive file (.tar.gz) to destination."""
-    archive = tarfile.open(filename)
-    archive.extractall(destination)
-
-def mktempdir(delete_on_exit=True):
-    """Create a temporary directory and optionally have it removed on
-    exit.
-
-    """
-    tmpdir = tempfile.mkdtemp("idstools-rulemman-tmp")
-    if delete_on_exit:
-        atexit.register(shutil.rmtree, tmpdir, ignore_errors=True)
-    return tmpdir
+    @unittest.skipIf(
+        not os.path.exists(
+            "/opt/nsm/lib/snort_dynamicengine/libsf_engine.so"),
+        "file not installed")
+    def test_guess_dynamic_engine_lib(self):
+        app = snort.SnortApp(path = "/opt/nsm/bin/snort")
+        self.assertEquals(app.dynamic_engine_lib,
+                          "/opt/nsm/lib/snort_dynamicengine/libsf_engine.so")
+        
