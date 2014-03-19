@@ -216,8 +216,10 @@ def parse_fileobj(fileobj, group=None):
     """
     rules = []
     for line in fileobj:
+        if type(line) == type(b""):
+            line = line.decode()
         try:
-            rule = parse(line.decode())
+            rule = parse(line)
             if rule:
                 rules.append(rule)
         except:

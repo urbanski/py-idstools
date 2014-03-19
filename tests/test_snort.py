@@ -26,8 +26,12 @@
 from __future__ import print_function
 
 import os
-import unittest
 import tempfile
+
+try:
+    import unittest2 as unittest
+except:
+    import unittest
 
 from idstools import snort
 
