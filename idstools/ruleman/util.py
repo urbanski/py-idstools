@@ -55,7 +55,7 @@ def md5_file(fileobj):
     return hashlib.md5(fileobj.read()).hexdigest()
 
 def md5_filename(filename):
-    return md5_file(open(filename))
+    return md5_file(open(filename, "rb"))
 
 def extract_archive(filename, destination):
     """Extract an archive file (.tar.gz) to destination."""

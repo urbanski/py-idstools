@@ -31,13 +31,14 @@ import os.path
 import tempfile
 import shutil
 import logging
+import io
 
 import idstools.net
 import idstools.snort
 
 from idstools.ruleman import util
 
-from dumpdynamicrules import DumpDynamicRulesCommand
+from idstools.ruleman.commands.dumpdynamicrules import DumpDynamicRulesCommand
 
 LOG = logging.getLogger()
 
@@ -54,13 +55,16 @@ class FetchCommand(object):
         fetched = []
 
         for remote in self.remotes.values():
-            if self.args and name not in self.args:
+            if self.args and remote["name"] not in self.args:
                 continue
             if not remote["enabled"]:
                 continue
-            fileobj = self.fetch(remote)
-            if fileobj:
-                fetched.append({"remote": remote, "fileobj": fileobj})
+            if self.check_checksum(remote):
+                LOG.info("Remote checksum has not changed, not fetching")
+            else:
+                fileobj = self.fetch(remote)
+                if fileobj:
+                    fetched.append({"remote": remote, "fileobj": fileobj})
 
         print("Fetched:", [item["remote"]["name"] for item in fetched])
 
@@ -96,11 +100,24 @@ class FetchCommand(object):
         DumpDynamicRulesCommand(
             self.config, ["--remote", remote]).run()
 
+    def check_checksum(self, remote):
+        """ Check the current checksum against the remote checksum.
+
+        Return True if they match, otherwise return False.
+        """
+        current_checksum = self.current_checksum(remote)
+        if current_checksum:
+            remote_checksum = self.fetch_checksum(remote)
+            if remote_checksum and remote_checksum == current_checksum:
+                return True
+        return False
+
     def fetch(self, remote):
+
         print("Fetching %s : %s" % (
             remote["name"], util.get_filename_from_url(remote["url"])))
         fileobj = tempfile.NamedTemporaryFile(
-            suffix=util.get_filename_from_url(remote["url"]))
+            suffix=util.get_filename_from_url(remote["url"]), mode="wb")
         try:
             length, info = idstools.net.get(
                 remote["url"], fileobj, self.progress_hook)
@@ -115,6 +132,30 @@ class FetchCommand(object):
                 print("  | %s" % (line))
         except Exception as err:
             print(" error: %s" % (err))
+
+    def current_checksum(self, remote):
+        checksum_filename = "remotes/%s/checksum" % (remote["name"])
+        if os.path.exists(checksum_filename):
+            return open(checksum_filename, "rb").read()
+        else:
+            LOG.debug("No checksum file exists for ruleset %s", remote["name"])
+
+    def fetch_checksum(self, remote):
+        checksum_url = self.get_checksum_url(remote)
+        buf = io.BytesIO()
+        try:
+            length, info = idstools.net.get(checksum_url, buf)
+            return buf.getvalue().strip()
+        except idstools.net.HTTPError as err:
+            LOG.warn("Error fetching checksum url %s: %s %s" % (
+                checksum_url, err.code, err.msg))
+            return None
+
+    def get_checksum_url(self, remote):
+        filename = util.get_filename_from_url(remote["url"])
+        checksum_filename = "%s.md5" % (filename)
+        checksum_url = remote["url"].replace(filename, checksum_filename)
+        return checksum_url
 
     def progress_hook(self, content_length, bytes_read):
         percent = int((bytes_read / float(content_length)) * 100)

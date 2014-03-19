@@ -217,7 +217,7 @@ def parse_fileobj(fileobj, group=None):
     rules = []
     for line in fileobj:
         try:
-            rule = parse(line)
+            rule = parse(line.decode())
             if rule:
                 rules.append(rule)
         except:

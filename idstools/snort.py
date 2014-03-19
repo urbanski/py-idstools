@@ -54,7 +54,7 @@ class SnortApp(object):
     def set_dynamic_engine_lib(self, dynamic_engine_lib, config):
         if dynamic_engine_lib:
             return dynamic_engine_lib
-        elif config and config.has_key("dynamic-engine-lib"):
+        elif config and "dynamic-engine-lib" in config:
             return config.get("dynamic-engine-lib")
         else:
             directory, basename = os.path.split(self.path)

@@ -176,7 +176,7 @@ class ApplyCommand(object):
 
         with open("snort.rules", "wb") as fileobj:
             for rule in rules.values():
-                fileobj.write(str(rule) + "\n")
+                fileobj.write((str(rule) + "\n").encode())
 
 commands = {
     "fetch": FetchCommand,
