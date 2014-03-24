@@ -32,23 +32,23 @@ import types
 from idstools.ruleman.commands.common import BaseCommand
 from idstools.ruleman.commands.common import CommandLineError
 
-class RemoteCommand(object):
+class SourceCommand(object):
 
     usage = """
-usage: %(progname)s remote [-h]
-   or: %(progname)s remote add <name> <url>
-   or: %(progname)s remote remove <name>
-   or: %(progname)s remote disable <name>
-   or: %(progname)s remote enable <name>
-   or: %(progname)s remote set <name> <parameter> <value>
-   or: %(progname)s remote ignore-file <remote-name> <filename>
-   or: %(progname)s remote ignore-file --remove <remote-name> <filename>
+usage: %(progname)s source [-h]
+   or: %(progname)s source add <name> <url>
+   or: %(progname)s source remove <name>
+   or: %(progname)s source disable <name>
+   or: %(progname)s source enable <name>
+   or: %(progname)s source set <name> <parameter> <value>
+   or: %(progname)s source ignore-file <source-name> <filename>
+   or: %(progname)s source ignore-file --remove <source-name> <filename>
 """ % {"progname": sys.argv[0]}
 
     def __init__(self, config, args):
         self.config = config
         self.args = args
-        self.remotes = config.get_remotes()
+        self.sources = config.get_sources()
 
         self.opt_remove = False
 
@@ -59,7 +59,7 @@ usage: %(progname)s remote [-h]
             "disable": self.disable,
             "set": self.set_parameter,
 
-            "ignore-file": RemoteSubCommandIgnoreFile,
+            "ignore-file": SourceSubCommandIgnoreFile,
 
             # Aliases.
             "rm": self.remove,
@@ -103,24 +103,24 @@ usage: %(progname)s remote [-h]
         key = self.args.pop(0)
         val = self.args.pop(0)
 
-        if name not in self.remotes:
-            print("error: remote %s does not exist." % (name), file=sys.stderr)
+        if name not in self.sources:
+            print("error: source %s does not exist." % (name), file=sys.stderr)
 
-        self.remotes[name][key] = val
+        self.sources[name][key] = val
 
     def list(self):
-        for remote in self.remotes:
-            print("%s: %s" % (remote, self.remotes[remote]))
+        for source in self.sources:
+            print("%s: %s" % (source, self.sources[source]))
 
     def add(self):
         name = self.args.pop(0)
         url = self.args.pop(0)
 
-        if name in self.remotes:
-            print("error: remote %s already exists" % (name), file=sys.stderr)
+        if name in self.sources:
+            print("error: source %s already exists" % (name), file=sys.stderr)
             return 1
 
-        self.remotes[name] = {
+        self.sources[name] = {
             "name": name,
             "url": url,
         }
@@ -129,47 +129,47 @@ usage: %(progname)s remote [-h]
 
     def remove(self):
         name = self.args.pop(0)
-        if name not in self.remotes:
-            print("error: remote %s does not exist" % (name), file=sys.stderr)
+        if name not in self.sources:
+            print("error: source %s does not exist" % (name), file=sys.stderr)
             return 1
-        del(self.remotes[name])
+        del(self.sources[name])
     
     remove.usage = "usage: remove <name>"
 
     def enable(self):
         name = self.args.pop(0)
-        if name not in self.remotes:
-            print("error: remote %s does not exist" % (name), file=sys.stderr)
-        self.remotes[name]["enabled"] = True
+        if name not in self.sources:
+            print("error: source %s does not exist" % (name), file=sys.stderr)
+        self.sources[name]["enabled"] = True
 
     enable.usage = "usage: enable <name>"
 
     def disable(self):
         name = self.args.pop(0)
         if name == "*":
-            for remote in self.remotes.values():
-                remote["enabled"] = False
+            for source in self.sources.values():
+                source["enabled"] = False
         else:
-            if name not in self.remotes:
-                print("error: remote %s does not exist" % (name),
+            if name not in self.sources:
+                print("error: source %s does not exist" % (name),
                       file=sys.stderr)
-                self.remotes[name]["enabled"] = False
+                self.sources[name]["enabled"] = False
             else:
-                self.remotes[name]["enabled"] = False
+                self.sources[name]["enabled"] = False
 
     disable.usage = "usage: disable <name>"
 
-class RemoteSubCommandIgnoreFile(BaseCommand):
+class SourceSubCommandIgnoreFile(BaseCommand):
 
     usage = """
-usage: ignore-file <remote-name> <filename>
-   or: ignore-file --remove <remote-name> <filename>
+usage: ignore-file <source-name> <filename>
+   or: ignore-file --remove <source-name> <filename>
 """
 
     def __init__(self, config, args):
         self.config = config
         self.args = args
-        self.remotes = config.get_remotes()
+        self.sources = config.get_sources()
 
         self.opt_remove = False
 
@@ -185,15 +185,15 @@ usage: ignore-file <remote-name> <filename>
         except:
             raise CommandLineError("not enough arguments")
 
-        if name not in self.remotes:
-            print("error: remote %s does not exist" % (name), file=sys.stderr)
+        if name not in self.sources:
+            print("error: source %s does not exist" % (name), file=sys.stderr)
             return 1
-        remote = self.remotes[name]
-        if "ignore-files" not in remote:
-            remote["ignore-files"] = []
+        source = self.sources[name]
+        if "ignore-files" not in source:
+            source["ignore-files"] = []
         if self.opt_remove:
-            if filename in remote["ignore-files"]:
-                remote["ignore-files"].remove(filename)
+            if filename in source["ignore-files"]:
+                source["ignore-files"].remove(filename)
         else:
-            remote["ignore-files"].append(filename)
-            remote["ignore-files"] = list(set(remote["ignore-files"]))
+            source["ignore-files"].append(filename)
+            source["ignore-files"] = list(set(source["ignore-files"]))

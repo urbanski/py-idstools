@@ -41,7 +41,7 @@ from idstools.ruleman import core
 
 from idstools.ruleman.commands.common import BaseCommand
 from idstools.ruleman.commands.common import CommandLineError
-from idstools.ruleman.commands.remote import RemoteCommand
+from idstools.ruleman.commands.source import SourceCommand
 from idstools.ruleman.commands.fetch import FetchCommand
 from idstools.ruleman.commands.dumpdynamicrules import DumpDynamicRulesCommand
 
@@ -156,11 +156,11 @@ class ApplyCommand(object):
 
         rulesets = []
 
-        remotes = self.config.get_remotes()
-        for remote in remotes.values():
-            if remote["enabled"]:
-                print("Loading rules from %s" % (remote["name"]))
-                ruleset = core.Ruleset(remote)
+        sources = self.config.get_sources()
+        for source in sources.values():
+            if source["enabled"]:
+                print("Loading rules from %s" % (source["name"]))
+                ruleset = core.Ruleset(source)
                 ruleset.load_rules()
                 print("- Loaded %d rules." % (len(ruleset.rules)))
                 rulesets.append(ruleset)
@@ -180,7 +180,7 @@ class ApplyCommand(object):
 
 commands = {
     "fetch": FetchCommand,
-    "remote": RemoteCommand,
+    "source": SourceCommand,
     "disable": DisableRuleCommand,
     "search": SearchCommand,
     "apply": ApplyCommand,

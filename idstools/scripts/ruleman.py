@@ -47,11 +47,11 @@ logging.basicConfig(format="%(message)s", level=logging.INFO)
 class Config(collections.MutableMapping):
 
     config_template = {
-        "remotes": {},
+        "sources": {},
         "disabled-rules": [],
     }
     
-    remote_template = {
+    source_template = {
         "name": "",
         "url": "",
         "enabled": True,
@@ -77,13 +77,13 @@ class Config(collections.MutableMapping):
     def __len__(self):
         return len(self.store)
 
-    def get_remotes(self):
-        remotes = self.store["remotes"]
-        for remote in remotes.values():
-            for key, default in self.remote_template.items():
-                if key not in remote:
-                    remote[key] = default
-        return remotes
+    def get_sources(self):
+        sources = self.store["sources"]
+        for source in sources.values():
+            for key, default in self.source_template.items():
+                if key not in source:
+                    source[key] = default
+        return sources
 
     def save(self):
         yaml.safe_dump(

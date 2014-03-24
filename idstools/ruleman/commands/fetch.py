@@ -48,30 +48,30 @@ class FetchCommand(object):
         self.config = config
         self.args = args
 
-        self.remotes = self.config.get_remotes()
+        self.sources = self.config.get_sources()
 
     def run(self):
 
         fetched = []
 
-        for remote in self.remotes.values():
-            if self.args and remote["name"] not in self.args:
+        for source in self.sources.values():
+            if self.args and source["name"] not in self.args:
                 continue
-            if not remote["enabled"]:
+            if not source["enabled"]:
                 continue
-            if self.check_checksum(remote):
-                LOG.info("Remote checksum has not changed, not fetching")
+            if self.check_checksum(source):
+                LOG.info("Source checksum has not changed, not fetching")
             else:
-                fileobj = self.fetch(remote)
+                fileobj = self.fetch(source)
                 if fileobj:
-                    fetched.append({"remote": remote, "fileobj": fileobj})
+                    fetched.append({"source": source, "fileobj": fileobj})
 
-        print("Fetched:", [item["remote"]["name"] for item in fetched])
+        print("Fetched:", [item["source"]["name"] for item in fetched])
 
         for entry in fetched:
-            remote = entry["remote"]
-            print("Extracting %s." % remote["name"])
-            dest = "remotes/%s" % remote["name"]
+            source = entry["source"]
+            print("Extracting %s." % source["name"])
+            dest = "sources/%s" % source["name"]
             if os.path.exists(dest):
                 shutil.rmtree(dest)
             os.makedirs(dest)
@@ -79,18 +79,18 @@ class FetchCommand(object):
             open("%s/checksum" % (dest), "w").write(
                 util.md5_filename(entry["fileobj"].name))
 
-            self.dump_dynamic_rules(remote["name"])
+            self.dump_dynamic_rules(source["name"])
 
-    def has_dynamic_rules(self, remote):
-        if os.path.exists("remotes/%s/so_rules" % (remote)):
+    def has_dynamic_rules(self, source):
+        if os.path.exists("sources/%s/so_rules" % (source)):
             return True
         else:
             return False
 
-    def dump_dynamic_rules(self, remote):
-        if not self.has_dynamic_rules(remote):
-            LOG.debug("Remote %s does not appear to have dynamic rules",
-                      remote)
+    def dump_dynamic_rules(self, source):
+        if not self.has_dynamic_rules(source):
+            LOG.debug("Source %s does not appear to have dynamic rules",
+                      source)
             return
 
         if "snort" not in self.config:
@@ -98,29 +98,29 @@ class FetchCommand(object):
             return
 
         DumpDynamicRulesCommand(
-            self.config, ["--remote", remote]).run()
+            self.config, ["--source", source]).run()
 
-    def check_checksum(self, remote):
-        """ Check the current checksum against the remote checksum.
+    def check_checksum(self, source):
+        """ Check the current checksum against the source checksum.
 
         Return True if they match, otherwise return False.
         """
-        current_checksum = self.current_checksum(remote)
+        current_checksum = self.current_checksum(source)
         if current_checksum:
-            remote_checksum = self.fetch_checksum(remote)
-            if remote_checksum and remote_checksum == current_checksum:
+            source_checksum = self.fetch_checksum(source)
+            if source_checksum and source_checksum == current_checksum:
                 return True
         return False
 
-    def fetch(self, remote):
+    def fetch(self, source):
 
         print("Fetching %s : %s" % (
-            remote["name"], util.get_filename_from_url(remote["url"])))
+            source["name"], util.get_filename_from_url(source["url"])))
         fileobj = tempfile.NamedTemporaryFile(
-            suffix=util.get_filename_from_url(remote["url"]), mode="wb")
+            suffix=util.get_filename_from_url(source["url"]), mode="wb")
         try:
             length, info = idstools.net.get(
-                remote["url"], fileobj, self.progress_hook)
+                source["url"], fileobj, self.progress_hook)
             # A print to print a new line.
             print("")
             return fileobj
@@ -133,15 +133,15 @@ class FetchCommand(object):
         except Exception as err:
             print(" error: %s" % (err))
 
-    def current_checksum(self, remote):
-        checksum_filename = "remotes/%s/checksum" % (remote["name"])
+    def current_checksum(self, source):
+        checksum_filename = "sources/%s/checksum" % (source["name"])
         if os.path.exists(checksum_filename):
             return open(checksum_filename, "rb").read()
         else:
-            LOG.debug("No checksum file exists for ruleset %s", remote["name"])
+            LOG.debug("No checksum file exists for ruleset %s", source["name"])
 
-    def fetch_checksum(self, remote):
-        checksum_url = self.get_checksum_url(remote)
+    def fetch_checksum(self, source):
+        checksum_url = self.get_checksum_url(source)
         buf = io.BytesIO()
         try:
             length, info = idstools.net.get(checksum_url, buf)
@@ -151,10 +151,10 @@ class FetchCommand(object):
                 checksum_url, err.code, err.msg))
             return None
 
-    def get_checksum_url(self, remote):
-        filename = util.get_filename_from_url(remote["url"])
+    def get_checksum_url(self, source):
+        filename = util.get_filename_from_url(source["url"])
         checksum_filename = "%s.md5" % (filename)
-        checksum_url = remote["url"].replace(filename, checksum_filename)
+        checksum_url = source["url"].replace(filename, checksum_filename)
         return checksum_url
 
     def progress_hook(self, content_length, bytes_read):

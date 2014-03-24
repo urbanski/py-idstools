@@ -38,7 +38,7 @@ class Ruleset(object):
     def __init__(self, config):
         self.config = config
         self.directory = os.path.abspath(
-            os.path.join("remotes", self.config["name"]))
+            os.path.join("sources", self.config["name"]))
 
         # Rules keyed by (gid, sid).  Loaded by load_rules.
         self.rules = {}
