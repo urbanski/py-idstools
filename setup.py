@@ -13,6 +13,8 @@ setup(
         "idstools.scripts",
         "idstools.compat",
         "idstools.compat.argparse",
+        "idstools.ruleman",
+        "idstools.ruleman.commands",
     ],
     url="https://github.com/jasonish/py-idstools",
     license="BSD",
