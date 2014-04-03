@@ -28,6 +28,7 @@
 from __future__ import print_function
 
 import re
+import fnmatch
 
 class ReRuleMatcher(object):
 
@@ -97,10 +98,34 @@ class ClasstypeMatcher(object):
                 pass
         return None
 
+class GroupMatcher(object):
+
+    def __init__(self, group):
+        self.group = group
+
+    def match(self, rule):
+        if hasattr(rule, "group") and rule.group is not None:
+            return fnmatch.fnmatch(rule.group, self.group)
+        return False
+
+    def __repr__(self):
+        return "group:%s" % (self.group)
+
+    @classmethod
+    def parse(cls, buf):
+        if buf.startswith("group:"):
+            try:
+                group = buf.split(":", 1)[1]
+                return cls(group)
+            except:
+                pass
+        return None
+
 matchers = [
     SidRuleMatcher,
     ReRuleMatcher,
     ClasstypeMatcher,
+    GroupMatcher,
 ]
 
 def parse(buf):

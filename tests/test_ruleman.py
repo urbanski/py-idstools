@@ -27,7 +27,9 @@ from __future__ import print_function
 
 import unittest
 
+import idstools.rule
 from idstools.ruleman import util
+from idstools.ruleman.matchers import GroupMatcher
 
 class RulemanUtilTestCase(unittest.TestCase):
 
@@ -40,3 +42,32 @@ class RulemanUtilTestCase(unittest.TestCase):
         url = "http://localhost/ruleset.tar.gz/some-oink-code"
         filename = "ruleset.tar.gz"
         self.assertEqual(util.get_filename_from_url(url), filename)
+
+class GroupMatcherTestCase(unittest.TestCase):
+
+    def test_parse(self):
+
+        self.assertTrue(GroupMatcher.parse("re:something") == None)
+        self.assertTrue(GroupMatcher.parse("classtype:something") == None)
+        self.assertTrue(GroupMatcher.parse("groups:asdf") == None)
+
+        self.assertTrue(
+            GroupMatcher.parse("group:rules/stream-event.rules") != None)
+
+    def test_match(self):
+        matcher = GroupMatcher.parse("group:rules/stream-events.rules")
+        
+        rule = idstools.rule.Rule()
+        self.assertFalse(matcher.match(rule))
+
+        rule.group = "rules/stream-events.rules"
+        self.assertTrue(matcher.match(rule))
+
+        matcher = GroupMatcher.parse("group:*/stream-events.rules")
+        self.assertTrue(matcher.match(rule))
+
+        matcher = GroupMatcher.parse("group:*stream-events.rules")
+        self.assertTrue(matcher.match(rule))
+
+        matcher = GroupMatcher.parse("group:rules/stream-events*")
+        self.assertTrue(matcher.match(rule))

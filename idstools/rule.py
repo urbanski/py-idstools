@@ -219,7 +219,7 @@ def parse_fileobj(fileobj, group=None):
         if type(line) == type(b""):
             line = line.decode()
         try:
-            rule = parse(line)
+            rule = parse(line, group)
             if rule:
                 rules.append(rule)
         except:

@@ -36,7 +36,7 @@ import idstools.net
 import idstools.rule
 
 from idstools.ruleman import util
-from idstools.ruleman import matchers
+from idstools.ruleman import matchers as rulematchers
 from idstools.ruleman import core
 
 from idstools.ruleman.commands.common import BaseCommand
@@ -85,7 +85,7 @@ usage: %(progname)s disable [-h]
         descriptor = self.args[0]
         message = " ".join(self.args[1:])
 
-        matcher = matchers.parse(self.args[0])
+        matcher = rulematchers.parse(self.args[0])
         if not matcher:
             print("error: invalid rule matcher: %s" % (descriptor))
             return 1
@@ -125,20 +125,26 @@ class SearchCommand(object):
             print("error: nothing to search for.")
             return 1
 
-        matcher = matchers.ReRuleMatcher.parse("re:" + self.args[0])
+        matcher = rulematchers.ReRuleMatcher.parse("re:" + self.args[0])
 
-        directories = ["rules", "so_rules", "preproc_rules"]
+        for filename in self.iter_source_rule_files():
+            rules = idstools.rule.parse_fileobj(open(filename))
+            for rule in rules:
+                if matcher.match(rule):
+                    ruleset, group = self.parse_filename(filename)
+                    print("%s:%s: %s" % (
+                        ruleset, group, self.render_brief(rule)))
 
-        for directory in [d for d in directories if os.path.exists(d)]:
-            for dirpath, dirnames, filenames in os.walk(directory):
-                for filename in \
-                    [fn for fn in filenames if fn.endswith(".rules")]:
-                    path = os.path.join(dirpath, filename)
-                    rules = idstools.rule.parse_fileobj(open(path))
-                    for rule in rules:
-                        if matcher.match(rule):
-                            print("%s %s" % (
-                                path, self.render_brief(rule)))
+    def parse_filename(self, filename):
+        parts = filename.split("/")
+        return parts[1], "/".join(parts[2:])
+
+    def iter_source_rule_files(self):
+        for source in self.config.get_sources():
+            for dirpath, dirs, files in os.walk("sources/%s" % (source)):
+                for filename in files:
+                    if filename.endswith(".rules"):
+                        yield os.path.join(dirpath, filename)
 
     def render_brief(self, rule):
         return "%s[%d:%d:%d] %s" % (
@@ -174,9 +180,34 @@ class ApplyCommand(object):
                 else:
                     rules[rule.id] = rule
 
+        disabled = self.disable_rules(rules)
+        print("- %s rules disabled." % (len(disabled)))
+
+        flowbit_resolver = idstools.rule.FlowbitResolver()
+        enabled = flowbit_resolver.resolve(rules)
+        print("- Enabled %d rules for flowbit dependencies." % (len(enabled)))
+
+        count = 0
         with open("snort.rules", "wb") as fileobj:
             for rule in rules.values():
-                fileobj.write((str(rule) + "\n").encode())
+                if rule.enabled:
+                    fileobj.write((str(rule) + "\n").encode())
+                    count += 1
+        print("Wrote %d rules to %s." % (count, "snort.rules"))
+
+    def disable_rules(self, rules):
+        matchers = []
+        for entry in self.config["disabled-rules"]:
+            matchers.append(rulematchers.parse(entry["matcher"]))
+
+        disabled = []
+        for rule in rules.values():
+            for matcher in matchers:
+                if matcher.match(rule) and rule.enabled:
+                    rule.enabled = False
+                    disabled.append(rule)
+
+        return disabled
 
 commands = {
     "fetch": FetchCommand,
