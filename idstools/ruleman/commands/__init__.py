@@ -217,3 +217,12 @@ commands = {
     "apply": ApplyCommand,
     "dump-dynamic-rules": DumpDynamicRulesCommand,
 }
+
+command_help = """
+  fetch                Fetch rule sources
+  source               Manage rule sources
+  disable              Disable rules
+  search               Search rules
+  apply                Apply ruleset modifications and write
+  dump-dynamic-rules   Dump dynamic rules
+"""

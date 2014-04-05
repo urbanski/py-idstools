@@ -36,41 +36,31 @@ from idstools.ruleman.commands.common import BaseCommand
 class DumpDynamicRulesCommand(BaseCommand):
 
     usage = """
-usage: %(progname)s dump-dynamic-rules --remote <remote>
-""" % {"progname": sys.argv[0]}
+usage: %(progname)s dump-dynamic-rules <source-name>
+""" % {"progname": os.path.basename(sys.argv[0])}
 
     def __init__(self, config, args):
         self.config = config
         self.args = args
 
-        self.opt_remote = None
-
     def run(self):
 
-        try:
-            opts, self.args = getopt.getopt(self.args, "", ["remote="])
-        except getopt.GetoptError as err:
-            print("error: %s" % (err), file=sys.stderr)
+        if not self.args:
             print(self.usage, file=sys.stderr)
             return 1
-        for o, a in opts:
-            if o in ["--remote"]:
-                self.opt_remote = a
+        return self.dump_source(self.args[0])
 
-        if self.opt_remote:
-            return self.dump_remote()
+    def dump_source(self, source_name):
 
-    def dump_remote(self):
-
-        remote_path = os.path.join("remotes", self.opt_remote)
-        if not os.path.exists(remote_path):
-            print("error: remote %s does not exist" % (self.opt_remote),
+        source_path = os.path.join("sources", source_name)
+        if not os.path.exists(source_path):
+            print("error: source %s does not exist" % (source_name),
                   file=sys.stderr)
             return 1
 
-        if not os.path.exists(os.path.join(remote_path, "so_rules")):
-            print("error: remote %s does not appear to have dynamic rules" % (
-                self.opt_remote), file=sys.stderr)
+        if not os.path.exists(os.path.join(source_path, "so_rules")):
+            print("error: source %s does not appear to have dynamic rules" % (
+                source_name), file=sys.stderr)
             return 1
 
         if not "snort" in self.config:
@@ -81,10 +71,10 @@ usage: %(progname)s dump-dynamic-rules --remote <remote>
         snortapp = idstools.snort.SnortApp(self.config.get("snort"))
         files = snortapp.dump_dynamic_rules(
             snortapp.find_dynamic_detection_lib_dir(
-                "remotes/%s" % (self.opt_remote)))
+                "sources/%s" % (source_name)))
         if files:
             destination_dir = os.path.join(
-                "remotes", self.opt_remote, "so_rules")  
+                "sources", source_name, "so_rules")  
             for filename in files:
                 if os.path.exists(os.path.join(destination_dir, filename)):
                     print("Overwriting %s." % os.path.join(

@@ -25,6 +25,7 @@
 
 from __future__ import print_function
 
+import os.path
 import sys
 import getopt
 import types
@@ -43,7 +44,7 @@ usage: %(progname)s source [-h]
    or: %(progname)s source set <name> <parameter> <value>
    or: %(progname)s source ignore-file <source-name> <filename>
    or: %(progname)s source ignore-file --remove <source-name> <filename>
-""" % {"progname": sys.argv[0]}
+""" % {"progname": os.path.basename(sys.argv[0])}
 
     def __init__(self, config, args):
         self.config = config

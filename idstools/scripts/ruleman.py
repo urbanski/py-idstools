@@ -29,6 +29,7 @@ from __future__ import print_function
 
 import sys
 import os
+import os.path
 import getopt
 import json
 import collections
@@ -100,6 +101,14 @@ def load_config():
             config.update(yaml_config)
     return config
 
+def usage():
+    print("""usage: %s <command> [args...]
+
+Commands:
+%s""" % (
+    os.path.basename(sys.argv[0]),
+    commands.command_help))
+
 def main():
 
     try:
@@ -108,13 +117,18 @@ def main():
         print("error: %s" % (err), file=sys.stderr)
         return 1
 
-    command = args.pop(0)
+    if not args:
+        usage()
+        return 0
+
+    command, args = args[0], args[1:]
     config = load_config()
 
     if command in commands.commands:
         commands.commands[command](config, args).run()
     else:
         print("error: unknown command: %s" % (command), file=sys.stderr)
+        usage()
         return 1
 
     # Dump a YAML config as well.
