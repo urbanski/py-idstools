@@ -61,6 +61,12 @@ class Ruleset(object):
 
         return self._filenames
 
+    def total_count(self):
+        return len(self.rules)
+
+    def enabled_count(self):
+        return len([rule for rule in self.rules.values() if rule.enabled])
+
     def get_fileobj(self, filename):
         return open(os.path.join(self.directory, filename), "rb")
 
@@ -74,3 +80,18 @@ class Ruleset(object):
                     print("warning: duplicate rule id found")
                 else:
                     self.rules[rule.id] = rule
+
+    def set_policy(self, policy):
+        for rule in self.rules.values():
+            if policy in self.get_policies(rule):
+                rule.enabled = True
+            else:
+                rule.enabled = False
+
+    def get_policies(self, rule):
+        policies = []
+        for item in rule.metadata:
+            if item.startswith("policy"):
+                parts = item.split()
+                policies.append(parts[1])
+        return policies

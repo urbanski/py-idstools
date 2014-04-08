@@ -32,6 +32,7 @@ import types
 
 from idstools.ruleman.commands.common import BaseCommand
 from idstools.ruleman.commands.common import CommandLineError
+from idstools.ruleman.commands.common import CommandError
 
 class SourceCommand(object):
 
@@ -44,14 +45,14 @@ usage: %(progname)s source [-h]
    or: %(progname)s source set <name> <parameter> <value>
    or: %(progname)s source ignore-file <source-name> <filename>
    or: %(progname)s source ignore-file --remove <source-name> <filename>
+   or: %(progname)s source set-policy <source> <policy>
+   or: %(progname)s source unset-policy <source>
 """ % {"progname": os.path.basename(sys.argv[0])}
 
     def __init__(self, config, args):
         self.config = config
         self.args = args
         self.sources = config.get_sources()
-
-        self.opt_remove = False
 
         self.subcommands = {
             "add": self.add,
@@ -61,6 +62,9 @@ usage: %(progname)s source [-h]
             "set": self.set_parameter,
 
             "ignore-file": SourceSubCommandIgnoreFile,
+            
+            "set-policy": self.set_policy,
+            "unset-policy": self.unset_policy,
 
             # Aliases.
             "rm": self.remove,
@@ -68,7 +72,7 @@ usage: %(progname)s source [-h]
 
     def run(self):
         try:
-            self.opts, self.args = getopt.getopt(self.args, "h", ["remove"])
+            self.opts, self.args = getopt.getopt(self.args, "h", [])
         except getopt.GetoptError as err:
             print("error: %s" % (err), file=sys.stderr)
             print(self.usage, file=sys.stderr)
@@ -77,8 +81,6 @@ usage: %(progname)s source [-h]
             if o == "-h":
                 print(self.usage)
                 return 0
-            elif o in ["--remove"]:
-                self.opt_remove = True
 
         if not self.args:
             return self.list()
@@ -95,9 +97,34 @@ usage: %(progname)s source [-h]
                     return self.subcommands[command]()
             except (getopt.GetoptError, CommandLineError) as err:
                 print("error: %s" % (err), file=sys.stderr)
-                print(self.subcommands[command].usage, file=sys.stderr)
+                usage = getattr(self.subcommands[command], "usage", self.usage)
+                print(usage, file=sys.stderr)
+                return 1
+            except CommandError as err:
+                print("error: %s" % (err))
+                return 1
         else:
             print("error: unknown subcommand: %s" % (command), file=sys.stderr)
+
+    def set_policy(self):
+        try:
+            source = self.args[0]
+            policy = self.args[1]
+        except:
+            raise CommandLineError("missing argument(s)")
+        if source not in self.sources:
+            raise CommandError("source %s does not exist" % (source))
+        self.sources[source]["policy"] = policy
+
+    def unset_policy(self):
+        try:
+            source = self.args[0]
+        except:
+            raise CommandLineError("missing argument")
+        if source not in self.sources:
+            raise CommandError("source %s does not exist" % (source))
+        if "policy" in self.sources[source]:
+            del(self.sources[source]["policy"])
 
     def set_parameter(self):
         name = self.args.pop(0)

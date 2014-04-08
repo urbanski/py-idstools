@@ -44,6 +44,7 @@ from idstools.ruleman.commands.common import CommandLineError
 from idstools.ruleman.commands.source import SourceCommand
 from idstools.ruleman.commands.fetch import FetchCommand
 from idstools.ruleman.commands.dumpdynamicrules import DumpDynamicRulesCommand
+from idstools.ruleman.commands.config import ConfigCommand
 
 class DisableRuleCommand(object):
 
@@ -168,7 +169,17 @@ class ApplyCommand(object):
                 print("Loading rules from %s" % (source["name"]))
                 ruleset = core.Ruleset(source)
                 ruleset.load_rules()
-                print("- Loaded %d rules." % (len(ruleset.rules)))
+                print("- Loaded %d rules (%d enabled)." % (
+                    ruleset.total_count(),
+                    ruleset.enabled_count()))
+
+                if "policy" in source:
+                    policy = source["policy"]
+                    print("- Applying policy %s." % (policy))
+                    ruleset.set_policy(source["policy"])
+                    print("- Now %d rules enabled." % (
+                        ruleset.enabled_count()))
+
                 rulesets.append(ruleset)
 
         rules = {}
@@ -215,6 +226,7 @@ commands = {
     "disable": DisableRuleCommand,
     "search": SearchCommand,
     "apply": ApplyCommand,
+    "config": ConfigCommand,
     "dump-dynamic-rules": DumpDynamicRulesCommand,
 }
 
@@ -224,5 +236,6 @@ command_help = """
   disable              Disable rules
   search               Search rules
   apply                Apply ruleset modifications and write
+  config               Configuration commands
   dump-dynamic-rules   Dump dynamic rules
 """

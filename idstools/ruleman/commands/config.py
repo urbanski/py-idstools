@@ -1,4 +1,4 @@
-# Copyright (c) 2011 Jason Ish
+# Copyright (c) 2011-2014 Jason Ish
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -25,11 +25,40 @@
 
 from __future__ import print_function
 
-class BaseCommand(object):
-    pass
+import sys
+import os.path
+import getopt
 
-class CommandLineError(Exception):
-    pass
+from idstools.ruleman.commands.common import BaseCommand
 
-class CommandError(Exception):
-    pass
+class ConfigCommand(BaseCommand):
+
+    usage = """
+usage %(progname)s config [-h]
+   or %(progname)s config snort.path <path-to-snort>
+   or %(progname)s config snort.os <OS-type>
+   or %(progname)s config snort.dynamic-engine-lib <path-to-engine-lib>
+""" % {
+    "progname": os.path.basename(sys.argv[0]),
+}
+    
+    def __init__(self, config, args):
+        self.config = config
+        self.args = args
+
+    def run(self):
+        try:
+            opts, self.args = getopt.getopt(self.args, "-h", [])
+        except getopt.GetoptError as err:
+            print(self.usage, file=sys.stderr)
+            return 1
+        for o, a in opts:
+            if o in ["-h"]:
+                print(self.usage)
+                return 0
+
+        raise Exception("Command not yet implemented.")
+
+    def show(self):
+        for key in self.config:
+            print(key)
