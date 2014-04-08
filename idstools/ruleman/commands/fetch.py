@@ -97,8 +97,7 @@ class FetchCommand(object):
             LOG.warn("Not generating dynamic rule stubs, snort not configured")
             return
 
-        DumpDynamicRulesCommand(
-            self.config, ["--source", source]).run()
+        DumpDynamicRulesCommand(self.config, [source]).run()
 
     def check_checksum(self, source):
         """ Check the current checksum against the source checksum.
