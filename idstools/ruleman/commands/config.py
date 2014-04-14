@@ -50,6 +50,7 @@ usage %(progname)s config [-h]
         try:
             opts, self.args = getopt.getopt(self.args, "-h", [])
         except getopt.GetoptError as err:
+            print("error: %s" % (err), file=sys.stderr)
             print(self.usage, file=sys.stderr)
             return 1
         for o, a in opts:
@@ -57,8 +58,36 @@ usage %(progname)s config [-h]
                 print(self.usage)
                 return 0
 
-        raise Exception("Command not yet implemented.")
+        if not self.args:
+            self.show(self.config.store)
+        else:
+            key = self.args[0].split(".")
+            return self.set_value(key, self.args[1:])
 
-    def show(self):
-        for key in self.config:
-            print(key)
+    def show(self, root, prefix=[]):
+        if type(root) == type({}):
+            for key in root:
+                self.show(root[key], prefix + [key])
+        elif type(root) == type([]):
+            for i, val in enumerate(root):
+                self.show(val, prefix + [str(i)])
+        else:
+            print("%s=%s" % (".".join(prefix), root))
+
+    def set_value(self, key, value):
+        if key[0] == "snort":
+            return self.set_snort_value(key[1:], value)
+
+    def set_snort_value(self, key, value):
+        if "snort" not in self.config:
+            self.config["snort"] = {}
+        if key[0] == "path":
+            path = value[0]
+            if not os.path.exists(path):
+                print("error: %s does not exist." % (path), file=sys.stderr)
+                return 1
+            self.config["snort"]["path"] = path
+        elif key[0] == "os":
+            self.config["snort"][key[0]] = value[0]
+        elif key[0] == "dynamic-engine-lib":
+            self.config["snort"][key[0]] = value[0]

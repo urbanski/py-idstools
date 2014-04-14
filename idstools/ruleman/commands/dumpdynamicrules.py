@@ -69,9 +69,13 @@ usage: %(progname)s dump-dynamic-rules <source-name>
             return 1
 
         snortapp = idstools.snort.SnortApp(self.config.get("snort"))
-        files = snortapp.dump_dynamic_rules(
-            snortapp.find_dynamic_detection_lib_dir(
-                "sources/%s" % (source_name)))
+        dynamic_rule_directory = snortapp.find_dynamic_detection_lib_dir(
+            "sources/%s" % (source_name))
+        if dynamic_rule_directory is None:
+            print("error: failed to find dynamic rule directory")
+            return 1
+
+        files = snortapp.dump_dynamic_rules(dynamic_rule_directory)
         if files:
             destination_dir = os.path.join(
                 "sources", source_name, "so_rules")  
