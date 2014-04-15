@@ -50,6 +50,7 @@ class Config(collections.MutableMapping):
     config_template = {
         "sources": {},
         "disabled-rules": [],
+        "enabled-rules": [],
     }
     
     source_template = {

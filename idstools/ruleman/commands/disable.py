@@ -27,27 +27,8 @@ from __future__ import print_function
 
 import sys
 import getopt
-import tempfile
-import subprocess
-import os.path
-import shutil
 
-import idstools.net
-import idstools.rule
-
-from idstools.ruleman import util
 from idstools.ruleman import matchers as rulematchers
-from idstools.ruleman import core
-
-from idstools.ruleman.commands.common import BaseCommand
-from idstools.ruleman.commands.common import CommandLineError
-from idstools.ruleman.commands.source import SourceCommand
-from idstools.ruleman.commands.fetch import FetchCommand
-from idstools.ruleman.commands.dumpdynamicrules import DumpDynamicRulesCommand
-from idstools.ruleman.commands.config import ConfigCommand
-from idstools.ruleman.commands.disable import DisableRuleCommand
-from idstools.ruleman.commands.enable import EnableRuleCommand
-from idstools.ruleman.commands.apply import ApplyCommand
 
 class DisableRuleCommand(object):
 
@@ -72,7 +53,7 @@ usage: %(progname)s disable [-h]
                 ["help", "remove"])
         except getopt.GetoptError as err:
             print("error: %s" % (err), file=sys.stderr)
-            print(usage)
+            print(self.usage)
             return 1
         for o, a in opts:
             if o == "-h":
@@ -117,62 +98,3 @@ usage: %(progname)s disable [-h]
     def list(self):
         for disabled in self.config["disabled-rules"]:
             print("%s: %s" % (disabled["matcher"], disabled["comment"]))
-
-class SearchCommand(object):
-
-    def __init__(self, config, args):
-        self.config = config
-        self.args = args
-
-    def run(self):
-        if not self.args:
-            print("error: nothing to search for.")
-            return 1
-
-        matcher = rulematchers.ReRuleMatcher.parse("re:" + self.args[0])
-
-        for filename in self.iter_source_rule_files():
-            rules = idstools.rule.parse_fileobj(open(filename))
-            for rule in rules:
-                if matcher.match(rule):
-                    ruleset, group = self.parse_filename(filename)
-                    print("%s:%s: %s" % (
-                        ruleset, group, self.render_brief(rule)))
-
-    def parse_filename(self, filename):
-        parts = filename.split("/")
-        return parts[1], "/".join(parts[2:])
-
-    def iter_source_rule_files(self):
-        for source in self.config.get_sources():
-            for dirpath, dirs, files in os.walk("sources/%s" % (source)):
-                for filename in files:
-                    if filename.endswith(".rules"):
-                        yield os.path.join(dirpath, filename)
-
-    def render_brief(self, rule):
-        return "%s[%d:%d:%d] %s" % (
-            "" if rule.enabled else "# ",
-            rule.gid, rule.sid, rule.rev,
-            rule.msg)
-
-commands = {
-    "fetch": FetchCommand,
-    "source": SourceCommand,
-    "disable": DisableRuleCommand,
-    "enable": EnableRuleCommand,
-    "search": SearchCommand,
-    "apply": ApplyCommand,
-    "config": ConfigCommand,
-    "dump-dynamic-rules": DumpDynamicRulesCommand,
-}
-
-command_help = """
-  fetch                Fetch rule sources
-  source               Manage rule sources
-  disable              Disable rules
-  search               Search rules
-  apply                Apply ruleset modifications and write
-  config               Configuration commands
-  dump-dynamic-rules   Dump dynamic rules
-"""
