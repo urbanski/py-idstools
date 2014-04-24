@@ -25,5 +25,6 @@ setup(
         "bin/idstools-gensidmsgmap",
         "bin/idstools-u2fast",
         "bin/idstools-u2json",
+        "bin/idstools-ruleman",
     ],
 )
